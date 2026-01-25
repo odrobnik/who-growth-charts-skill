@@ -11,7 +11,9 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend
 import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 from matplotlib.ticker import FuncFormatter, MultipleLocator
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from scipy import stats, interpolate
 from datetime import datetime
 from pathlib import Path
@@ -72,7 +74,67 @@ WHO_DATA_FILES = {
 }
 
 BASE_DIR = Path(__file__).parent
-CACHE_DIR = BASE_DIR / 'cache'
+
+def get_base_output_dir():
+    """Get the base output directory for charts and cache."""
+    # Default to ~/clawd/who-growth-charts (sibling to skills folder)
+    try:
+        # script is in .../clawd/skills/who-growth-charts/scripts/
+        # workspace is ../../../
+        workspace_dir = BASE_DIR.parents[2]
+        if workspace_dir.name != 'clawd': 
+            workspace_dir = Path.home() / 'clawd'
+    except IndexError:
+            workspace_dir = Path.home() / 'clawd'
+    
+    return workspace_dir / 'who-growth-charts'
+
+CACHE_DIR = get_base_output_dir() / 'cache'
+
+WHO_EMBLEM_URL = "https://cdn.who.int/media/images/default-source/infographics/who-emblem.png"
+_WHO_EMBLEM_IMG = None
+
+def _get_who_emblem_img():
+    """Load and cache the WHO emblem from online if needed."""
+    global _WHO_EMBLEM_IMG
+    if _WHO_EMBLEM_IMG is not None:
+        return _WHO_EMBLEM_IMG
+    
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    emblem_path = CACHE_DIR / 'who-emblem.png'
+    
+    if not emblem_path.exists():
+        print(f"Downloading WHO emblem...", file=sys.stderr)
+        ctx = ssl.create_default_context()
+        req = urllib.request.Request(WHO_EMBLEM_URL, headers={
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Clawdbot/1.0'
+        })
+        try:
+            with urllib.request.urlopen(req, context=ctx, timeout=30) as response:
+                emblem_path.write_bytes(response.read())
+            print(f"  Cached: {emblem_path.name}", file=sys.stderr)
+        except Exception as e:
+            print(f"Failed to download WHO emblem: {e}", file=sys.stderr)
+            _WHO_EMBLEM_IMG = False
+            return None
+
+    try:
+        img = mpimg.imread(str(emblem_path))
+        _WHO_EMBLEM_IMG = img
+        return _WHO_EMBLEM_IMG
+    except Exception:
+        _WHO_EMBLEM_IMG = False
+        return None
+
+
+def add_who_emblem(ax, loc: str = 'upper left'):
+    """Add the WHO emblem inside the chart boundary (no-op if missing)."""
+    emblem = _get_who_emblem_img()
+    if emblem is None:
+        return
+    axins = inset_axes(ax, width="10%", height="18%", loc=loc, borderpad=0.8)
+    axins.imshow(emblem)
+    axins.axis('off')
 
 
 def ensure_who_data(metric: str, sex: str, age_range: str) -> Path:
@@ -364,8 +426,19 @@ def plot_growth_chart(child_name, birthdate, sex, heights, weights, chart_type='
     # Create figure
     fig, ax = plt.subplots(figsize=(12, 8))
     
-    max_who_age = 228 if chart_type in ['height', 'bmi'] else 120
+    # Limit chart x-range
+    # - Height/BMI: WHO ref up to 19y (228 months)
+    # - Weight: WHO standards exist, but we intentionally cap display at 5y (60 months)
+    max_who_age = 228 if chart_type in ['height', 'bmi'] else 60
     max_age = min(current_age + 6, max_who_age)
+
+    # For weight charts we want to *only show the first 5 years*, even for older kids.
+    # Also filter child points to avoid y-limits being skewed by out-of-range data.
+    if chart_type == 'weight' and child_ages:
+        filtered = [(a, v) for a, v in zip(child_ages, child_values) if a <= max_age]
+        child_ages = [a for a, _ in filtered]
+        child_values = [v for _, v in filtered]
+
     age_range = percentile_df['age_months'].values
     age_mask = age_range <= max_age
     
@@ -440,10 +513,17 @@ def plot_growth_chart(child_name, birthdate, sex, heights, weights, chart_type='
         ax.set_ylim(y_min, y_max)
     
     plt.tight_layout()
+
+    # WHO emblem (if available)
+    add_who_emblem(ax, loc='upper left')
     
     # Save
-    out_dir = Path(output_dir) if output_dir else CACHE_DIR
-    out_dir.mkdir(exist_ok=True)
+    if output_dir:
+        out_dir = Path(output_dir)
+    else:
+        out_dir = get_base_output_dir()
+
+    out_dir.mkdir(parents=True, exist_ok=True)
     output_file = out_dir / f'{child_name.lower().replace(" ", "_")}_{chart_type}.png'
     plt.savefig(output_file, dpi=150, bbox_inches='tight')
     plt.close(fig)

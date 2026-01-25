@@ -17,6 +17,12 @@ Generate WHO Child Growth Standards charts with percentile curves and child data
 - **Downloads WHO data on demand** from cdn.who.int (cached locally)
 - Overlays child's actual measurements with trend line
 
+## Examples
+
+| Height | Weight | BMI |
+|--------|--------|-----|
+| <img src="examples/anna_height.png" width="250"> | <img src="examples/anna_weight.png" width="250"> | <img src="examples/anna_bmi.png" width="250"> |
+
 ## Prerequisites
 
 Install Python dependencies:
@@ -29,7 +35,7 @@ pip install pandas matplotlib scipy openpyxl
 ### Basic Chart Generation
 
 ```bash
-python3 {baseDir}/growth_chart.py "Child Name" "DD.MM.YYYY" --sex F --type all
+python3 ./scripts/growth_chart.py "Child Name" "DD.MM.YYYY" --sex F --type all
 ```
 
 Arguments:
@@ -42,78 +48,30 @@ Arguments:
 
 ### With Measurement Data
 
-Create a JSON file with height/weight measurements:
+Create a JSON file with height/weight measurements (heights in meters, weights in kg):
 ```json
 {
-  "heights": [
-    ["2024-01-15T10:00:00", 1.05],
-    ["2024-06-20T09:30:00", 1.08]
-  ],
-  "weights": [
-    ["2024-01-15T10:00:00", 17.5],
-    ["2024-06-20T09:30:00", 18.2]
-  ]
+  "heights": [ ["2024-01-15T10:00:00", 1.05] ],
+  "weights": [ ["2024-01-15T10:00:00", 17.5] ]
 }
 ```
 
-Heights are in **meters**, weights in **kg**. Dates are ISO format.
-
 ```bash
-python3 {baseDir}/growth_chart.py "Elise" "06.07.2016" --sex F --data elise_data.json --type all
+python3 ./scripts/growth_chart.py "Emma" "06.07.2016" --sex F --data emma_data.json --type all
 ```
 
 ### Integration with Withings
 
 Combine with `withings-family` skill to fetch weight data automatically:
 ```bash
-# Get Withings weight data
-python3 ~/clawd/skills/withings-family/withings.py elise body > /tmp/withings.json
+# Get Withings weight data (assuming withings-family skill is installed)
+python3 ../withings-family/scripts/withings.py emma body > /tmp/withings.json
 
-# Parse and generate charts (you'll need to transform the JSON format)
+# Parse and generate charts
+# (The growth chart script handles Withings JSON format if implemented, otherwise transform it)
 ```
-
-## WHO Data Sources
-
-Data is automatically downloaded from the WHO Child Growth Standards:
-- `cdn.who.int/.../length-height-for-age/...`
-- `cdn.who.int/.../weight-for-age/...`
-- `cdn.who.int/.../body-mass-index-for-age/...`
-
-Files are cached in `{baseDir}/cache/` after first download.
 
 ## Output
 
-Charts are saved as PNG files:
-- `{name}_height.png`
-- `{name}_weight.png`
-- `{name}_bmi.png`
-
-Default output location: `{baseDir}/cache/`
-
-## Chart Features
-
-- **Percentile bands**: 5th, 15th, 50th (median), 85th, 95th
-- **Shaded regions** between percentiles for easy reading
-- **Child's data points** (red dots)
-- **Trend line** (solid red) through measurements
-- **Projection** (dashed red) extrapolating future growth
-- **Age in years** on x-axis with year markers
-
-## Examples
-
-Generate all charts for a girl:
-```bash
-python3 {baseDir}/growth_chart.py "Erika" "24.09.2018" --sex F --type all --data erika_merged_data.json
-```
-
-Generate only height chart for a boy:
-```bash
-python3 {baseDir}/growth_chart.py "Max" "15.03.2020" --sex M --type height --data max_data.json
-```
-
-## Notes
-
-- WHO weight-for-age standards only go to age 10 (120 months)
-- Height and BMI standards extend to age 19 (228 months)
-- First run downloads ~200KB of WHO data files
-- Subsequent runs use cached data
+Charts are saved as PNG files in `~/clawd/who-growth-charts/` by default (or specified output directory).
+Data cache and assets are stored in `~/clawd/who-growth-charts/cache/`.
