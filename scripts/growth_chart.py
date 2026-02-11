@@ -75,19 +75,24 @@ WHO_DATA_FILES = {
 
 BASE_DIR = Path(__file__).parent
 
+
+def _find_workspace_root() -> Path:
+    """Walk up from script location to find workspace root (parent of 'skills/')."""
+    import os
+    env = os.environ.get("WHO_GROWTH_CHARTS_WORKSPACE")
+    if env:
+        return Path(env)
+    d = Path(__file__).resolve().parent
+    for _ in range(6):
+        if (d / "skills").is_dir() and d != d.parent:
+            return d
+        d = d.parent
+    return Path.cwd()
+
+
 def get_base_output_dir():
     """Get the base output directory for charts and cache."""
-    # Default to ~/clawd/who-growth-charts (sibling to skills folder)
-    try:
-        # script is in .../clawd/skills/who-growth-charts/scripts/
-        # workspace is ../../../
-        workspace_dir = BASE_DIR.parents[2]
-        if workspace_dir.name != 'clawd': 
-            workspace_dir = Path.home() / 'clawd'
-    except IndexError:
-            workspace_dir = Path.home() / 'clawd'
-    
-    return workspace_dir / 'who-growth-charts'
+    return _find_workspace_root() / 'who-growth-charts'
 
 CACHE_DIR = get_base_output_dir() / 'cache'
 
