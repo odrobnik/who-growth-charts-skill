@@ -75,3 +75,8 @@ python3 ../withings-family/scripts/withings.py emma body > /tmp/withings.json
 
 Charts are saved as PNG files in `~/clawd/who-growth-charts/` by default (or specified output directory).
 Data cache and assets are stored in `~/clawd/who-growth-charts/cache/`.
+
+## Documentation
+
+- [SKILL.md](SKILL.md) — agent-facing reference (commands, behavior, limitations)
+- [ClawHub](https://www.clawhub.com/skills/who-growth-charts) — install via ClawHub registry
